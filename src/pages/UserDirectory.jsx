@@ -1,21 +1,12 @@
 import { useState, useEffect, Suspense, lazy } from "react";
-import axios from "axios";
 import { Container, Box, CircularProgress, Typography } from "@mui/material";
 import Header from "../components/Header";
 import ViewControls from "../components/ViewControls";
-import UserProfile from "../components/UserProfile";
 import { useViewContext } from "../context/ViewContext";
 import userService from "../services/UserService";
+import UserCard from "../components/UserCard";
+import UserTable from "../components/UserTable";
 
-const UserCard = lazy(() => import("../components/UserCard"));
-const UserTable = lazy(() => import("../components/UserTable"));
-
-
-const LoadingFallback = () => (
-  <Box display="flex" justifyContent="center" p={4}>
-    <CircularProgress />
-  </Box>
-);
 
 const UserDirectory = () => {
   const [users, setUsers] = useState([]);
@@ -24,37 +15,22 @@ const UserDirectory = () => {
   const { viewMode, roleFilter } = useViewContext();
   const [filteredUsers, setFilteredUsers] = useState([]);
 
-  //   const fetchUsers = async () => {
-  //     try {
-  //       setLoading(true);
-  //       let data;
-  //       if (roleFilter === 'all') {
-  //         data = await userService.getAllUsers();
-  //       } else {
-  //         data = await userService.getUsersByRole(roleFilter);
-  //       }
-  //       setUsers(data);
-  //       setFilteredUsers(data);
-  //     } catch (error) {
-  //       console.error("Failed to load users", error);
-  //       setError("Failed to load users");
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchUsers();
-  // }, [roleFilter]);
-
-  // 1st useEffect - Fetch all users on mount
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        
         setLoading(true);
-        const data = await userService.getAllUsers();
-        setUsers(data);
-        setFilteredUsers(data);
+
+        
+        const allUsers = await userService.getAllUsers();
+        setUsers(allUsers); // Store all users (for roles)
+
+        // Fetch filtered users from backend
+        if (roleFilter === "all") {
+          setFilteredUsers(allUsers);
+        } else {
+          const filteredUsers = await userService.getUsersByRole(roleFilter);
+          setFilteredUsers(filteredUsers);
+        }
       } catch (error) {
         console.error("Failed to load users", error);
         setError("Failed to load users");
@@ -64,29 +40,7 @@ const UserDirectory = () => {
     };
 
     fetchUsers();
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    if (roleFilter === "all") {
-      setFilteredUsers(users);
-    } else {
-      const fetchFilteredUsers = async () => {
-        try {
-          setLoading(true);
-          const data = await userService.getUsersByRole(roleFilter);
-          setFilteredUsers(data);
-        } catch (error) {
-          console.error("Failed to load users", error);
-          setError("Failed to filter users");
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchFilteredUsers();
-    }
-    setLoading(false);
-  }, [roleFilter]);
+  }, [roleFilter]); 
 
   // const handleProfileOpen = (user) => {
   //   setSelectedUser(user);
@@ -97,55 +51,48 @@ const UserDirectory = () => {
   //   setProfileOpen(false);
   // };
 
-  if (loading) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="100vh"
-      >
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
-
   return (
     <>
       <Header />
 
-      <Container maxWidth="lg" sx={{ pb: 4 }}>
-        <ViewControls users={users} />
+      {loading ? (
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="80vh" // Reduced height so it doesn't push Header
+        >
+          <CircularProgress />
+        </Box>
+      ) : error ? (
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="80vh"
+        >
+          <Typography color="error">{error}</Typography>
+        </Box>
+      ) : (
+        <Container maxWidth="lg" sx={{ pb: 4 }}>
+          <ViewControls users={users} />
 
-        <Suspense fallback={<LoadingFallback />}>
-          {viewMode === "card" ? (
-            <Box
-              display="grid"
-              gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))"
-              gap={3}
-            >
-              {filteredUsers.map((user) => (
-                <UserCard key={user.id} user={user} />
-              ))}
-            </Box>
-          ) : (
-            <UserTable users={filteredUsers} />
-          )}
-        </Suspense>
-      </Container>
+            {viewMode === "card" ? (
+              <Box
+                display="grid"
+                gridTemplateColumns="repeat(auto-fill, minmax(300px, 1fr))"
+                gap={3}
+              >
+                {filteredUsers.map((user) => (
+                  <UserCard key={user.id} user={user} />
+                ))}
+              </Box>
+            ) : (
+              <UserTable users={filteredUsers} />
+            )}
+          
+        </Container>
+      )}
 
       {/* <UserProfile
         user={selectedUser}
